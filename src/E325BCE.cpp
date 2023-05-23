@@ -64,6 +64,7 @@ struct E325BCE : Module {
 
 	void process(const ProcessArgs& args) override;
 	void euclid(int steps, int pulses){
+		
 		for (int y = 0; y<steps; y++) rhythm[y] = 0;
 		int bucket = 0;
 		for (int a=0; a < steps; a++){
@@ -116,35 +117,82 @@ void E325BCE::process(const ProcessArgs &args) {
 		paramQuantities[PULSES_PARAM]->snapEnabled = true;
 		paramQuantities[OFFSET_PARAM]->snapEnabled = true;	
 	}
-	euclid(numSteps,(int)(params[STEPS_PARAM].getValue())+inputs[STEPSCV_INPUT].getVoltage());
-	euclid2(numSteps,(int)(params[PULSES_PARAM].getValue())+inputs[PULSESCV_INPUT].getVoltage());
-	for (int w = 0; w<numSteps; w++){
-		rhythm3[w] = (rhythm[w] ^ rhythm2[w]);
+	
+	if ((int)params[MODE_PARAM].getValue() == 1) 
+	{
+		euclid((int)(params[STEPS_PARAM].getValue()+(int)inputs[STEPSCV_INPUT].getVoltage()),(int)(params[PULSES_PARAM].getValue())+(int)inputs[PULSESCV_INPUT].getVoltage());
 	}
+	else
+	{
+		euclid(numSteps,(int)(params[PULSES_PARAM].getValue())+(int)inputs[PULSESCV_INPUT].getVoltage());
+		euclid2(numSteps,(int)(params[STEPS_PARAM].getValue())+(int)inputs[STEPSCV_INPUT].getVoltage());
+		for (int w = 0; w<numSteps; w++){
+			rhythm3[w] = (rhythm[w] ^ rhythm2[w]);
+		}			
+	}
+	 
 	if (resetDetector.process(inputs[RESET_INPUT].getVoltage())) stepNr = 0;
 
 	if (clockDetector.process(inputs[CLOCK_INPUT].getVoltage())) {
 
-			int offsetVal = stepNr + params[OFFSET_PARAM].getValue();
+			int offsetVal = stepNr + params[OFFSET_PARAM].getValue()+(int)inputs[OFFSETCV_INPUT].getVoltage();
 			if (offsetVal > numSteps-1) {
 				offsetVal = offsetVal - numSteps-1;
 			}
-			if (rhythm3[offsetVal])
-				{
-				pgen.trigger(TRIG_TIME);
-				}
-			else {
-				auxPgen.trigger(TRIG_TIME);
+			if (offsetVal > numSteps-1) {
+				offsetVal = offsetVal - numSteps-1;
+			}			
+			if ((int)params[MODE_PARAM].getValue() == 1) 
+			{
+				if (rhythm[offsetVal])
+					{
+					pgen.trigger(TRIG_TIME);
+					}
+				else 
+					{
+					auxPgen.trigger(TRIG_TIME);
+					}				
+			}
+			else
+			{
+				if (rhythm3[offsetVal])
+					{
+					pgen.trigger(TRIG_TIME);
+					}
+				else 
+					{
+					auxPgen.trigger(TRIG_TIME);
+					}
+
 			}
 			stepNr = (stepNr + 1);
 
-			if (stepNr > numSteps-1) stepNr = 0;
+			//if (stepNr > numSteps-1) stepNr = 0;
+			if ((int)params[MODE_PARAM].getValue() == 1) 
+			{
+				if (stepNr > ((int)(params[STEPS_PARAM].getValue())-1)) stepNr = 0;
+			}
+			else
+			{
+				if(stepNr > numSteps-1) stepNr=0;
+			}
+			
 			printf("=-=-=-=-=-=-=-=- =-=-\n");
 			if (DEBUG_PRINT) {
-			//printf("Step: %d\n", stepNr);
-			for (int e = 0; e < numSteps; e++){
-				if (rhythm[e]) printf("1");
-				else printf("0");
+			printf("Step: %d\n", stepNr);
+			if ((int)params[MODE_PARAM].getValue() == 1) 
+			{
+				for (int e = 0; e < (int)(params[STEPS_PARAM].getValue()); e++){
+					if (rhythm[e]) printf("1");
+					else printf("0");
+				}
+			} 
+			else
+			{
+				for (int e = 0; e < numSteps; e++){
+					if (rhythm[e]) printf("1");
+					else printf("0");
+				}
 			}
 			printf(" \n");
 			for (int f = 0; f < numSteps; f++){
@@ -153,14 +201,23 @@ void E325BCE::process(const ProcessArgs &args) {
 			}
 			printf(" \n");
 			for (int f = 0; f < numSteps; f++){
-				if (rhythm3[f]) printf("1");
+				int offsetVal2 = f + params[OFFSET_PARAM].getValue()+(int)inputs[OFFSETCV_INPUT].getVoltage();
+				if (offsetVal2 > numSteps-1) 
+				{
+					offsetVal2 = offsetVal2 - numSteps-1;
+				}
+				if (offsetVal2 > numSteps-1) 
+				{
+					offsetVal2 = offsetVal2 - numSteps-1;
+				}
+				if (rhythm3[offsetVal2]) printf("1");
 				else printf("0");
 			}
 			printf(" \n");
 			}
 	}
-	bool pulse = pgen.process( args.sampleTime );
-	bool apulse = auxPgen.process( args.sampleTime );
+	bool pulse = pgen.process( args.sampleTime*2 );
+	bool apulse = auxPgen.process( args.sampleTime*2 );
 	outputs[MAINOUT_OUTPUT].setVoltage(pulse ? 10.f : 0.f);
 	outputs[AUXOUT_OUTPUT].setVoltage(apulse ? 10.f : 0.f);
 	lights[CLOCKLED_LIGHT].setSmoothBrightness(inputs[CLOCK_INPUT].getVoltage(),args.sampleTime);
