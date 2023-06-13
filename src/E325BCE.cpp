@@ -1,6 +1,6 @@
 #include "plugin.hpp"
 #include "dsp/digital.hpp"
-#define TRIG_TIME 1e-3f
+#define TRIG_TIME 1e-2f
 #define DEBUG_PRINT 1
 
 #define NORMAL 1
